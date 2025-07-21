@@ -1,147 +1,169 @@
-// ConsoleApplication1.cpp : This file contains the 'main' function. Program execution begins and ends there.
-//
-//Polymorphism
+// ConsoleApp.cpp : Demonstrates OOP principles in a simple fight simulation.
+
 #include <iostream>
+#include <memory>
+#include <string>
+#include <vector>
+#include <random>
 using namespace std;
-// GameStructure class with a pure virtual help method
+
+// --- Abstraction: GameStructure interface ---
 class GameStructure {
 public:
-    virtual void help() = 0; // Pure virtual method
+    virtual void help() const = 0;
+    virtual ~GameStructure() = default;
 };
-//Base class character inherited from GameStructure
+
+// --- Abstraction & Polymorphism: Weapon interface ---
+class Weapon {
+public:
+    virtual int damage() const = 0;
+    virtual string name() const = 0;
+    virtual ~Weapon() = default;
+};
+
+// Concrete Weapons
+class Star : public Weapon {
+public:
+    int damage() const override { return 25; }
+    string name() const override { return "Throwing Star"; }
+};
+class Sword : public Weapon {
+public:
+    int damage() const override { return 20; }
+    string name() const override { return "Sword Slash"; }
+};
+class Fireball : public Weapon {
+public:
+    int damage() const override { return 30; }
+    string name() const override { return "Fireball"; }
+};
+
+// --- Base Character class, encapsulates name & health ---
 class Character : public GameStructure {
 public:
-    string Name; //Public propety name for the character
-
-    //Constructor to initialize the Name and character Health
-    Character(string name, int health) : Name(name) {
-        setHealth(health); // Setter for health
+    Character(string name, int health, unique_ptr<Weapon> w)
+        : name_(move(name)), health_(health), weapon_(move(w)) {
     }
 
-        //Method to display character's names
-        void displayName() {
-        cout << "Character name: " << Name << endl;
+    const string& getName() const { return name_; }
+    int getHealth() const { return health_; }
+    void applyDamage(int d) {
+        health_ = max(0, health_ - d);
+        if (health_ == 0)
+            cout << name_ << " has fallen!\n";
     }
 
-    //First Talk Method (overloaded)
-        void Talk() {
-            cout << Name << " says: I'm ready to fight!" << endl;
-            }
-
-     //Second Talk method (overloaded) using two parameters
-        void Talk(string name, string saysStuff) {
-			cout << name << " says: " << saysStuff << endl;
-		}
-
-    //Public method to get health status
-    int getHealth() {
-        return Health;
+    virtual int attack() const {
+        cout << name_ << " attacks with "
+            << weapon_->name()
+            << " for " << weapon_->damage() << " dmg.\n";
+        return weapon_->damage();
     }
 
-    //Public method to set health status
-    void setHealth(int health) {
-        if (health < 0) {
-            Health = 0;
-            cout << "Character has expired" << endl;
-        }
-        else {
-            Health = health;
-        }
+    void help() const override {
+        cout << name_ << " has no special hints.\n";
     }
 
-    //Virtual attack method, can be overridden by derived classes
-    virtual int attack() {
-		return 10; // Base attack power is 10 hp
-	}
-    
-	//override the pure virtual method from GameStructure class
-    void help() override {}
+    virtual ~Character() = default;
+
+protected:
+    const unique_ptr<Weapon> weapon_;
 
 private:
-    int Health; //Private property Health
+    string name_;
+    int health_;
 };
 
-// Derived class ninja from character
+// --- Derived classes with their own help messages ---
 class Ninja : public Character {
 public:
-    //Constructor to initialize the Name and character Health
-    Ninja(string name, int health) : Character(name, health) {}
-
-    //Method to throw stars ( specific for ninjas)
-    void ThrowStars() {
-        cout << "I am throwing stars!" << endl;
+    Ninja(string name, int health)
+        : Character(move(name), health, make_unique<Star>()) {
     }
 
-    //Override the attack method to return 25 hp
-    int attack() override {
-		return 25; // Ninja attack power is 25 hp
-	}
-
-    //override the help method to display something for just ninjas
-    void help() override {
-		cout << "Ninjas are cool, they can throw stars!" << endl;
-	}
+    void help() const override {
+        cout << "Ninja tip: Stay in the shadows and strike first!\n";
+    }
 };
 
-// Derived class pirate from character
 class Pirate : public Character {
 public:
-    //Constructor to initialize the Name and character Health
-    Pirate(string name, int health) : Character(name, health) {}
-
-    //Method to use sword (specific for pirates)
-    void UseSword() {
-        cout << "I am Swooshing my Sword!" << endl;
+    Pirate(string name, int health)
+        : Character(move(name), health, make_unique<Sword>()) {
     }
 
-    //Override the attack method to return 25 hp
-    int attack() override {
-		return 25; // Pirate attack power is 25 hp
-	}
-
-    //override the help method to display something for just pirates
-    void help() override {
-		cout << "Pirates are cool, they can swing swords!" << endl;
-	}
+    void help() const override {
+        cout << "Pirate tip: Keep your blade sharp and your wits sharper!\n";
+    }
 };
 
-//Function to display intro
-void displayIntro() {
-    cout << "Welcome to my simulation!!" << endl;
-    cout << "Choose the character you want wisely" << endl;
+class Wizard : public Character {
+public:
+    Wizard(string name, int health)
+        : Character(move(name), health, make_unique<Fireball>()) {
+    }
+
+    void help() const override {
+        cout << "Wizard tip: Mana is precious—choose spells wisely!\n";
+    }
+};
+
+// --- Utility: one round of battle between two characters ---
+void battleRound(Character& a, Character& b) {
+    int dmg = a.attack();
+    b.applyDamage(dmg);
+    if (b.getHealth() > 0) {
+        dmg = b.attack();
+        a.applyDamage(dmg);
+    }
 }
 
-int main()
-{
-    //Display Intro
+// --- Intro display ---
+void displayIntro() {
+    cout << "=== Welcome to the OOP Battle Simulator ===\n\n";
+}
+
+int main() {
     displayIntro();
 
-    //Create Ninja and Pirate objects
-    Ninja ninja1("Shadow", 100); //Create ninja character named shadow with 100 health
-    Pirate pirate1("Whitebeard", 100); //Create pirate character named whitebeard with 500 health
+    // Create our fighters
+    vector<unique_ptr<Character>> fighters;
+    fighters.emplace_back(make_unique<Ninja>("Shadow", 100));
+    fighters.emplace_back(make_unique<Pirate>("Blackbeard", 120));
+    fighters.emplace_back(make_unique<Wizard>("Merlin", 80));
 
-    //Display their names and actions
-    ninja1.displayName();
-    ninja1.ThrowStars();
-    cout << "Health:" << ninja1.getHealth() << endl;
-    cout << "Ninja attack power: " << ninja1.attack() << " hit points" << endl;
-    ninja1.help(); // display help for ninjas
+    // Show each character’s help tip
+    for (const auto& c : fighters) {
+        cout << "[" << c->getName() << "] ";
+        c->help();
+    }
+    cout << "\n";
 
-    pirate1.displayName();
-    pirate1.UseSword();
-    cout << "Health:" << pirate1.getHealth() << endl;
-    cout << "Pirate attack power: " << pirate1.attack() << " hit points" << endl;
-    pirate1.help(); // display help for pirates
+    // Pick two distinct fighters by index
+    int n = static_cast<int>(fighters.size());
+    mt19937 gen{ random_device{}() };
+    uniform_int_distribution<int> dist(0, n - 1);
+
+    int i1 = dist(gen);
+    int i2 = dist(gen);
+    while (i2 == i1) {
+        i2 = dist(gen);
+    }
+
+    Character& f1 = *fighters[i1];
+    Character& f2 = *fighters[i2];
+
+    cout << "Battle: " << f1.getName() << " vs. " << f2.getName() << "\n\n";
+
+    // Fight until one falls
+    while (f1.getHealth() > 0 && f2.getHealth() > 0) {
+        battleRound(f1, f2);
+        cout << f1.getName() << " HP: " << f1.getHealth()
+            << " | " << f2.getName() << " HP: " << f2.getHealth()
+            << "\n\n";
+    }
+
+    cout << "=== Simulation Ended ===\n";
+    return 0;
 }
-
-
-// Run program: Ctrl + F5 or Debug > Start Without Debugging menu
-// Debug program: F5 or Debug > Start Debugging menu
-
-// Tips for Getting Started: 
-//   1. Use the Solution Explorer window to add/manage files
-//   2. Use the Team Explorer window to connect to source control
-//   3. Use the Output window to see build output and other messages
-//   4. Use the Error List window to view errors
-//   5. Go to Project > Add New Item to create new code files, or Project > Add Existing Item to add existing code files to the project
-//   6. In the future, to open this project again, go to File > Open > Project and select the .sln file
